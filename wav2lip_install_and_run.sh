@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "==============================="
-echo "🚀 Wav2Lip GAN WebUI FINAL REMUX — AUTO RUN 🚀"
+echo "🚀 Wav2Lip GAN WebUI FINAL REMUX SAFE — AUTO RUN 🚀"
 echo "==============================="
 
 # 1) Cài ffmpeg + dos2unix
@@ -30,8 +30,8 @@ wget -q --show-progress https://huggingface.co/rippertnt/wav2lip/resolve/c16701c
 echo "📁 Creating outputs/ folder..."
 mkdir -p outputs
 
-# 6) Ghi app.py chuẩn REMUX
-echo "📝 Writing app.py with REMUX..."
+# 6) Ghi app.py chuẩn REMUX SAFE
+echo "📝 Writing app.py with REMUX SAFE..."
 cat > app.py << 'EOF'
 import os
 import shutil
@@ -52,34 +52,45 @@ def lip_sync(face, audio):
     raw_output = "results/result_voice.mp4"
     final_output = os.path.join(output_dir, "result_voice_final.mp4")
 
-    shutil.copy(face_input_path, face_name)
-    shutil.copy(audio_input_path, audio_name)
+    try:
+        shutil.copy(face_input_path, face_name)
+        shutil.copy(audio_input_path, audio_name)
 
-    cmd = [
-        "python3", "inference.py",
-        "--checkpoint_path", "checkpoints/wav2lip_gan.pth",
-        "--face", face_name,
-        "--audio", audio_name,
-        "--resize_factor", "1"
-    ]
+        cmd = [
+            "python3", "inference.py",
+            "--checkpoint_path", "checkpoints/wav2lip_gan.pth",
+            "--face", face_name,
+            "--audio", audio_name,
+            "--resize_factor", "1"
+        ]
+        if face_ext in ['.jpg', '.jpeg', '.png']:
+            cmd += ["--static", "True"]
 
-    if face_ext in ['.jpg', '.jpeg', '.png']:
-        cmd += ["--static", "True"]
+        subprocess.run(cmd, check=True)
 
-    subprocess.run(cmd, check=True)
+        if not os.path.exists(raw_output):
+            raise FileNotFoundError("Inference did not produce result_voice.mp4")
 
-    if os.path.exists(raw_output):
-        # Remux to ensure proper container
-        subprocess.run([
+        remux = subprocess.run([
             "ffmpeg", "-y", "-i", raw_output,
             "-c:v", "libx264",
             "-c:a", "aac",
             "-strict", "experimental",
             final_output
-        ], check=True)
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if remux.returncode != 0:
+            print(remux.stderr.decode())
+            raise RuntimeError("FFmpeg remux failed. Check logs above.")
+
+        if not os.path.exists(final_output):
+            raise FileNotFoundError("Remuxed output not found.")
+
         return final_output
-    else:
-        return "ERROR: Output video not found"
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return f"Error: {e}"
 
 iface = gr.Interface(
     fn=lip_sync,
@@ -88,16 +99,16 @@ iface = gr.Interface(
         gr.Audio(label="Upload Audio", type="filepath")
     ],
     outputs=gr.Video(label="Lipsynced Video"),
-    title="✨ Wav2Lip GAN WebUI — FINAL REMUX",
-    description="Upload image/video + audio → Click Run → Download always works."
+    title="✨ Wav2Lip GAN WebUI — FINAL REMUX SAFE",
+    description="Upload image/video + audio → Click Run → Output video always valid or clear error."
 )
 
 iface.launch(server_name="0.0.0.0", server_port=7860, share=True)
 EOF
 
-# 7) Đảm bảo line ending LF
+# 7) Fix line ending
 dos2unix app.py
 
-# 8) Chạy Gradio
-echo "✅ All ready! Starting Gradio WebUI FINAL REMUX..."
+# 8) Run Gradio
+echo "✅ All ready! Starting Gradio WebUI FINAL REMUX SAFE..."
 python3 app.py
