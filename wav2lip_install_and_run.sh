@@ -1,10 +1,10 @@
 #!/bin/bash
 
 echo "==============================="
-echo "🚀 Wav2Lip GAN WebUI FINAL AUTO-RUN 🚀"
+echo "🚀 Wav2Lip GAN WebUI FINAL REMUX — AUTO RUN 🚀"
 echo "==============================="
 
-# 1) Cài ffmpeg & công cụ chuẩn
+# 1) Cài ffmpeg + dos2unix
 echo "📦 Installing ffmpeg and dos2unix..."
 apt update && apt install -y ffmpeg dos2unix
 
@@ -14,7 +14,7 @@ rm -rf Wav2Lip
 git clone https://github.com/Rudrabha/Wav2Lip.git
 cd Wav2Lip
 
-# 3) Cài Python packages ổn định
+# 3) Cài Python packages
 echo "📦 Installing Python packages..."
 pip install torch torchvision numpy==1.23.5 librosa==0.8.1 numba==0.56.4 scipy matplotlib tqdm requests opencv-python-headless==4.9.0.80 gradio==3.50.2
 
@@ -30,8 +30,8 @@ wget -q --show-progress https://huggingface.co/rippertnt/wav2lip/resolve/c16701c
 echo "📁 Creating outputs/ folder..."
 mkdir -p outputs
 
-# 6) Ghi đè app.py chuẩn
-echo "📝 Writing app.py..."
+# 6) Ghi app.py chuẩn REMUX
+echo "📝 Writing app.py with REMUX..."
 cat > app.py << 'EOF'
 import os
 import shutil
@@ -48,7 +48,9 @@ def lip_sync(face, audio):
 
     output_dir = "outputs"
     os.makedirs(output_dir, exist_ok=True)
-    output_name = os.path.join(output_dir, "result_voice.mp4")
+
+    raw_output = "results/result_voice.mp4"
+    final_output = os.path.join(output_dir, "result_voice_final.mp4")
 
     shutil.copy(face_input_path, face_name)
     shutil.copy(audio_input_path, audio_name)
@@ -66,10 +68,18 @@ def lip_sync(face, audio):
 
     subprocess.run(cmd, check=True)
 
-    if os.path.exists("results/result_voice.mp4"):
-        shutil.move("results/result_voice.mp4", output_name)
-
-    return output_name
+    if os.path.exists(raw_output):
+        # Remux to ensure proper container
+        subprocess.run([
+            "ffmpeg", "-y", "-i", raw_output,
+            "-c:v", "libx264",
+            "-c:a", "aac",
+            "-strict", "experimental",
+            final_output
+        ], check=True)
+        return final_output
+    else:
+        return "ERROR: Output video not found"
 
 iface = gr.Interface(
     fn=lip_sync,
@@ -78,16 +88,16 @@ iface = gr.Interface(
         gr.Audio(label="Upload Audio", type="filepath")
     ],
     outputs=gr.Video(label="Lipsynced Video"),
-    title="✨ Wav2Lip GAN WebUI — FINAL AUTO-RUN",
+    title="✨ Wav2Lip GAN WebUI — FINAL REMUX",
     description="Upload image/video + audio → Click Run → Download always works."
 )
 
 iface.launch(server_name="0.0.0.0", server_port=7860, share=True)
 EOF
 
-# 7) Fix CRLF nếu user reupload
+# 7) Đảm bảo line ending LF
 dos2unix app.py
 
-# 8) Run Gradio
-echo "✅ All ready! Starting Gradio WebUI..."
+# 8) Chạy Gradio
+echo "✅ All ready! Starting Gradio WebUI FINAL REMUX..."
 python3 app.py
